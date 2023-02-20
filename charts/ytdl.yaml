@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ytdl-sub
+spec:
+  schedule: "5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: ytdl-config
+              nfs:
+                path: /srv/share/backed/appdata/yt-dlp
+                server: mario.local.ongy.net
+                readOnly: false
+            - name: media-data
+              nfs:
+                path: /srv/share/media/youtube
+                server: mario.local.ongy.net
+                readOnly: false
+          containers:
+          - name: ytdl
+            env:
+            - name: PUID
+              value: "1006"
+            - name: GUID
+              value: "1004"
+            - name: UMASK
+              value: "002"
+            - name: TZ
+              value: "Europe/Berlin"
+            securityContext:
+              privileged: true
+            image: ghcr.io/jmbannon/ytdl-sub:latest
+            imagePullPolicy: Always
+            command:
+            - ytdl-sub
+            - sub
+            workingDir: "/config"
+            volumeMounts:
+              - mountPath: "/config"
+                name: ytdl-config
+              - mountPath: "/tv_shows"
+                name: media-data
+          restartPolicy: OnFailure

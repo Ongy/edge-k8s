@@ -1,0 +1,17 @@
+# Currently not used due to incompatibility with my setup
+apiVersion: cert-manager.io/v1
+   kind: Issuer
+   metadata:
+     name: letsencrypt
+   spec:
+      # The ACME server URL
+      server: https://acme-v02.api.letsencrypt.org/directory
+      # Email address used for ACME registration
+      email: letsencrypt@ongy.net
+      # Name of a secret used to store the ACME account private key
+      privateKeySecretRef:
+        name: letsencrypt
+      solvers:
+      - dns01:
+        luaDNS:
+          

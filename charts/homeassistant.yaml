@@ -1,0 +1,81 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homeassistant
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: homeassistant
+  name: homeassistant
+  namespace: homeassistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homeassistant
+  template:
+    metadata:
+      labels:
+        app: homeassistant
+    spec:
+      volumes:
+        - name: ha-storage
+          hostPath:
+            path: "/srv/share/backed/appdata/homeassistant/config/"
+            type: Directory
+      containers:
+        - image: homeassistant/home-assistant:2023.2
+          name: home-assistant
+          volumeMounts:
+            - mountPath: "/config"
+              name: ha-storage
+          readinessProbe:
+            httpGet:
+              path: /manifest.json
+              port: 8123
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+spec:
+  selector:
+    app: homeassistant
+  ports:
+    - protocol: TCP
+      port: 8123
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: homeassistant
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [homeassistant.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: homeassistant.homeassistant.svc.cluster.local
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: homeassistant
+  namespace: homeassistant
+spec:
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8123

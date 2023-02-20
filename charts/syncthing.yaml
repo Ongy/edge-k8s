@@ -1,0 +1,90 @@
+# WIP configuration. Not in use yet
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: syncthing
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: syncthing
+  name: syncthing
+  namespace: syncthing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: syncthing
+  template:
+    metadata:
+      labels:
+        app: syncthing
+    spec:
+      volumes:
+        - name: syncthing-config
+          nfs:
+            path: /srv/share/backed/appdata/syncthing/
+            server: mario.local.ongy.net
+            readOnly: false
+        - name: media-data
+          nfs:
+            path: /srv/share/backed/appdata/photoprism/import/syncthing/
+            server: mario.local.ongy.net
+            readOnly: false
+      containers:
+        - image: syncthing/syncthing:latest
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8384
+          name: syncthing
+          volumeMounts:
+            - mountPath: "/var/syncthing"
+              name: syncthing-config
+            - mountPath: "/data/photoprism/phone"
+              name: media-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncthing
+  namespace: syncthing
+spec:
+  selector:
+    app: syncthing
+  ports:
+    - protocol: TCP
+      port: 8384
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: syncthing
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [syncthing.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: syncthing.syncthing.svc.cluster.local
+---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: syncthing
+#   namespace: syncthing
+# spec:
+#   policyTypes:
+#     - Ingress
+#     - Egress
+#   ingress:
+#     - from:
+#         - namespaceSelector:
+#             matchLabels:
+#               kubernetes.io/metadata.name: istio-system
+#       ports:
+#         - protocol: TCP
+#           port: 8384

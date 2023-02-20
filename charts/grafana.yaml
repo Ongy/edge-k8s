@@ -1,0 +1,94 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grafana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+  namespace: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      volumes:
+        - name: grafana-config
+          hostPath:
+            path: "/srv/share/backed/appdata/grafana/"
+            type: Directory
+      containers:
+        - image: grafana/grafana:latest
+          env:
+          - name: GF_PATHS_CONFIG
+            value: "/var/lib/grafana/grafana.ini"
+          - name: GF_SERVER_ROOT_URL
+            value: "https://grafana.local.ongy.net"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+          name: grafana
+          volumeMounts:
+            - mountPath: "/var/lib/grafana"
+              name: grafana-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - protocol: TCP
+      port: 3000
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: grafana
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [grafana.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: grafana.grafana.svc.cluster.local
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana
+  namespace: grafana
+spec:
+  policyTypes:
+    - Ingress
+#    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 3000
+#  egress:
+#    - to:
+#      - namespaceSelector:
+#          matchLabels:
+#            kubernetes.io/metadata.name: influxdb
+#      ports:
+#        - protocol: TCP
+#          port: 8086

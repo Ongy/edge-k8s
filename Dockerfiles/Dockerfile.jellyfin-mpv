@@ -1,0 +1,25 @@
+FROM alpine
+
+ENV PYTHONUNBUFFERED=1
+RUN apk add --update --no-cache python3 mpv yt-dlp && ln -sf python3 /usr/bin/python
+RUN python3 -m ensurepip && pip3 install --no-cache --upgrade jellyfin-mpv-shim
+
+ARG user=jellyfin
+ARG home=/home/$user
+
+# The -g/-u here come from the ubuntu 22.04 system I run this on
+# They match the user/render group that the host system runs with
+# To allow using gpu acceleration (gl/vaapi) and connecting
+# to the gnome-session
+RUN addgroup -S render -g 110
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home $home \
+    --ingroup render \
+    -u 1000 \
+    $user
+WORKDIR $home
+USER $user
+
+ENTRYPOINT [ "/usr/bin/jellyfin-mpv-shim" ]

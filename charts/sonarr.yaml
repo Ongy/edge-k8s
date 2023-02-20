@@ -1,0 +1,99 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sonarr
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sonarr
+  name: sonarr
+  namespace: sonarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonarr
+  template:
+    metadata:
+      labels:
+        app: sonarr
+    spec:
+      volumes:
+        - name: sonarr-config
+          nfs:
+            path: /srv/share/backed/appdata/sonarr/
+            server: mario.local.ongy.net
+            readOnly: false
+        - name: media-data
+          hostPath:
+            path: "/srv/share/media/"
+            type: Directory
+      containers:
+        - image: cr.hotio.dev/hotio/sonarr:latest
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8989
+          env:
+          - name: PUID
+            value: "1003"
+          - name: GUID
+            value: "1004"
+          - name: UMASK
+            value: "002"
+          securityContext:
+            privileged: true
+          name: sonarr
+          volumeMounts:
+            - mountPath: "/config"
+              name: sonarr-config
+            - mountPath: "/data"
+              name: media-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: sonarr
+spec:
+  selector:
+    app: sonarr
+  ports:
+    - protocol: TCP
+      port: 8989
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: sonarr
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [sonarr.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: sonarr.sonarr.svc.cluster.local
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sonarr
+  namespace: sonarr
+spec:
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homeassistant
+      ports:
+        - protocol: TCP
+          port: 8989

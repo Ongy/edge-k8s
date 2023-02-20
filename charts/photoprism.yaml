@@ -1,0 +1,88 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: photoprism
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: photoprism
+  name: photoprism
+  namespace: photoprism
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: photoprism
+  template:
+    metadata:
+      labels:
+        app: photoprism
+    spec:
+      volumes:
+        - name: photoprism-config
+          hostPath:
+            path: "/srv/share/backed/appdata/photoprism/"
+            type: Directory
+      containers:
+        - image: photoprism/photoprism
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 2342
+          env:
+          - name: PHOTOPRISM_UPLOAD_NSFW
+            value: "true"
+          - name: PHOTOPRISM_ADMIN_PASSWORD
+            value: "insecure"
+          - name: PHOTOPRISM_SPONSOR
+            value: "true"
+          name: photoprism
+          volumeMounts:
+            - mountPath: "/photoprism"
+              name: photoprism-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: photoprism
+  namespace: photoprism
+spec:
+  selector:
+    app: photoprism
+  ports:
+    - protocol: TCP
+      port: 2342
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: photoprism
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [photoprism.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: photoprism.photoprism.svc.cluster.local
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: photoprism
+  namespace: photoprism
+spec:
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 2342
