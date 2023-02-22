@@ -134,15 +134,23 @@ spec:
           hostPath:
             path: "/home/ongy/.config/jellyfin-mpv-shim/"
             type: Directory
+        - name: x11-unix
+          hostPath:
+            path: "/tmp/.X11-unix/"
+            type: Directory
       containers:
         - image: ongy.net/jellyfin-mpv-shim:alpha1
+#        - image: alpine
+#          command: ["sleep"]
+#          args: ["infinity"]
           imagePullPolicy: Never
-        #- image: ubuntu:22.04
-          #command: [sleep]
-          #args: [infinity]
           env:
           - name: XDG_RUNTIME_DIR
             value: "/run/user/1000/"
+          - name: WAYLAND_DISPLAY
+            value: "invalid"
+          - name: DISPLAY
+            value: ":0"
           securityContext:
             privileged: true
           name: jellyfin-mpv
@@ -151,3 +159,5 @@ spec:
               name: user-run
             - mountPath: "/home/jellyfin/.config/jellyfin-mpv-shim"
               name: config-home
+            - mountPath: "/tmp/.X11-unix/"
+              name: x11-unix
