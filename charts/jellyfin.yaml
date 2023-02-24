@@ -139,11 +139,10 @@ spec:
             path: "/tmp/.X11-unix/"
             type: Directory
       containers:
-        - image: ongy.net/jellyfin-mpv-shim:alpha1
+        - image: cr.local.ongy.net/jellyfin-mpv-shim:alpha1
 #        - image: alpine
 #          command: ["sleep"]
 #          args: ["infinity"]
-          imagePullPolicy: Never
           env:
           - name: XDG_RUNTIME_DIR
             value: "/run/user/1000/"
