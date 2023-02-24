@@ -1,0 +1,82 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: container-registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: container-registry
+  name: container-registry
+  namespace: container-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: container-registry
+  template:
+    metadata:
+      labels:
+        app: container-registry
+    spec:
+      volumes:
+        - name: container-data
+          nfs:
+            path: /srv/share/backed/appdata/container-registry
+            server: mario.local.ongy.net
+            readOnly: false
+      containers:
+        - image: registry:2
+#          readinessProbe:
+#            httpGet:
+#              path: /health
+#              port: 5000
+          name: container-registry
+          volumeMounts:
+            - mountPath: "/var/lib/registry/"
+              name: container-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: container-registry
+  namespace: container-registry
+spec:
+  selector:
+    app: container-registry
+  ports:
+    - protocol: TCP
+      port: 5000
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: container-registry
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [cr.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: container-registry.container-registry.svc.cluster.local
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: container-registry
+  namespace: container-registry
+spec:
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 5000
