@@ -6,7 +6,7 @@ metadata:
   name: syncthing
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   labels:
     app: syncthing
@@ -49,7 +49,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: syncthing
+  name: syncthing-http
   namespace: syncthing
 spec:
   selector:
@@ -58,6 +58,22 @@ spec:
     - protocol: TCP
       port: 8384
       name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncthing-sync
+  namespace: syncthing
+spec:
+  selector:
+    app: syncthing
+  ports:
+    - protocol: UDP
+      port: 22000
+      name: udp
+    - protocol: TCP
+      port: 22000
+      name: tcp
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -69,7 +85,7 @@ spec:
   http:
   - route:
     - destination:
-        host: syncthing.syncthing.svc.cluster.local
+        host: syncthing-http.syncthing.svc.cluster.local
 ---
 # apiVersion: networking.k8s.io/v1
 # kind: NetworkPolicy
@@ -88,3 +104,34 @@ spec:
 #       ports:
 #         - protocol: TCP
 #           port: 8384
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: syncthing-proxy
+  name: syncthing-proxy
+  namespace: syncthing
+spec:
+  #replicas: 1
+  selector:
+    matchLabels:
+      app: syncthing-proxy
+  template:
+    metadata:
+      labels:
+        app: syncthing-proxy
+    spec:
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      containers:
+        - image: alpine/socat
+          name: tcp-proxy
+          args:
+          - TCP6-LISTEN:22000,reuseaddr,fork
+          - TCP:syncthing-sync:22000
+        - image: alpine/socat
+          name: udp-proxy
+          args:
+          - UDP6-LISTEN:22000,reuseaddr,fork
+          - UDP:syncthing-sync:22000
