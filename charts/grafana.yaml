@@ -23,9 +23,10 @@ spec:
     spec:
       volumes:
         - name: grafana-config
-          hostPath:
-            path: "/srv/share/backed/appdata/grafana/"
-            type: Directory
+          nfs:
+            path: /srv/share/backed/appdata/grafana/
+            server: mario.local.ongy.net
+            readOnly: false
       containers:
         - image: grafana/grafana:latest
           env:

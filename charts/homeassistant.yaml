@@ -21,6 +21,8 @@ spec:
       labels:
         app: homeassistant
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: mario
       volumes:
         - name: ha-storage
           hostPath:

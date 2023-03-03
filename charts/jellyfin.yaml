@@ -21,6 +21,8 @@ spec:
       labels:
         app: jellyfin
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: mario
       volumes:
         - name: jellyfin-config
           hostPath:

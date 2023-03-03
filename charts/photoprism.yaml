@@ -23,9 +23,10 @@ spec:
     spec:
       volumes:
         - name: photoprism-config
-          hostPath:
-            path: "/srv/share/backed/appdata/photoprism/"
-            type: Directory
+          nfs:
+            path: /srv/share/backed/appdata/photoprism
+            server: mario.local.ongy.net
+            readOnly: false
       containers:
         - image: photoprism/photoprism
           readinessProbe:

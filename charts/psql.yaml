@@ -21,6 +21,8 @@ spec:
       labels:
         app: psql
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: mario
       volumes:
         - name: psql-data
           hostPath:

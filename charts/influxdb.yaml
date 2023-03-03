@@ -21,6 +21,8 @@ spec:
       labels:
         app: influxdb
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: mario
       volumes:
         - name: influxdb2-data
           hostPath:

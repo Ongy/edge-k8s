@@ -23,17 +23,20 @@ spec:
     spec:
       volumes:
         - name: mosquitto-config
-          hostPath:
-            path: "/srv/share/backed/appdata/mosquitto/config"
-            type: File
+          nfs:
+            path: /srv/share/backed/appdata/mosquitto/config
+            server: mario.local.ongy.net
+            readOnly: true
         - name: mosquitto-data
-          hostPath:
-            path: "/srv/share/backed/appdata/mosquitto/data/"
-            type: Directory
+          nfs:
+            path: /srv/share/backed/appdata/mosquitto/data
+            server: mario.local.ongy.net
+            readOnly: false
         - name: mosquitto-log
-          hostPath:
-            path: "/srv/share/backed/appdata/mosquitto/log/"
-            type: Directory
+          nfs:
+            path: /srv/share/backed/appdata/mosquitto/log
+            server: mario.local.ongy.net
+            readOnly: false
       containers:
         - image: eclipse-mosquitto:latest
           name: mosquitto
@@ -44,6 +47,20 @@ spec:
               name: mosquitto-log
             - mountPath: "/mosquitto/config/mosquitto.conf"
               name: mosquitto-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto-lb
+  namespace: mosquitto
+spec:
+  type: LoadBalancer
+  selector:
+    app: mosquitto
+  ports:
+    - protocol: TCP
+      port: 1883
+      name: mqtt
 ---
 apiVersion: v1
 kind: Service

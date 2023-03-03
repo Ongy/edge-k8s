@@ -28,9 +28,10 @@ spec:
             server: mario.local.ongy.net
             readOnly: false
         - name: media-data
-          hostPath:
-            path: "/srv/share/media/"
-            type: Directory
+          nfs:
+            path: /srv/share/media
+            server: mario.local.ongy.net
+            readOnly: false
       containers:
         - image: cr.hotio.dev/hotio/sonarr:latest
           readinessProbe:
