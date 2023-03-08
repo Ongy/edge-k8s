@@ -26,14 +26,13 @@ spec:
       credentialName: local-ongy-net
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   labels:
     app: ingress-proxy
   name: ingress-proxy
   namespace: istio-system
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: ingress-proxy
