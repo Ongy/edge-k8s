@@ -32,6 +32,14 @@ spec:
           hostPath:
             path: "/default/database/pg_wal"
             type: Directory
+        - name: psql-tls-secrets
+          secret:
+            secretName: psql-server-secret
+            optional: true
+            defaultMode: 0640
+      securityContext:
+        fsGroup: 70
+        fsGroupChangePolicy: "OnRootMismatch"
       containers:
         - image: postgres:14-alpine
           readinessProbe:
@@ -49,6 +57,9 @@ spec:
               name: psql-data
             - mountPath: "/wal"
               name: psql-wal
+            - name: psql-tls-secrets
+              mountPath: "/tls-secrets"
+              readOnly: true
 ---
 apiVersion: v1
 kind: Service
@@ -62,3 +73,21 @@ spec:
     - protocol: TCP
       port: 5432
       name: postgress
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: psql-server-secret
+  namespace: psql
+spec:
+  isCA: true
+  duration: 8760h # 1 years
+  commonName: psql.psql
+  secretName: psql-server-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: psql-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
