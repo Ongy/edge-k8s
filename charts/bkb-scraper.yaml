@@ -1,0 +1,184 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: event-aggregator
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: event-aggregator
+data:
+  mosquitto.conf: |-
+    # Ip/hostname to listen to.
+    # If not given, will listen on all interfaces
+    #bind_address
+
+    # Port to use for the default listener.
+    port 1883
+
+    # Allow anonymous users to connect?
+    # If not, the password file should be created
+    allow_anonymous true
+
+    # The password file.
+    # Use the `mosquitto_passwd` utility.
+    # If TLS is not compiled, plaintext "username:password" lines bay be used
+    # password_file /mosquitto/config/passwd
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: psql-client-secret
+  namespace: event-aggregator
+spec:
+  isCA: false
+  duration: 8760h # 1 years
+  commonName: karateevents
+  dnsNames: ["karateevents"]
+  secretName: psql-client-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: psql-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mosquitto
+  name: mosquitto
+  namespace: event-aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      volumes:
+        - name: mosquitto-config
+          configMap:
+            name: mosquitto-config
+      containers:
+        - image: eclipse-mosquitto:latest
+          name: mosquitto
+          volumeMounts:
+            - mountPath: "/mosquitto/config/mosquitto.conf"
+              name: mosquitto-config
+              subPath: mosquitto.conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mqtt
+  namespace: event-aggregator
+spec:
+  selector:
+    app: mosquitto
+  ports:
+    - protocol: TCP
+      port: 1883
+      name: mqtt
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: user-associator
+  name: user-associator
+  namespace: event-aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-associator
+  template:
+    metadata:
+      labels:
+        app: user-associator
+    spec:
+      volumes:
+        - name: psql-tls-secrets
+          secret:
+            secretName: psql-client-secret
+            optional: true
+            defaultMode: 0640
+      containers:
+        - image: cr.local.ongy.net/bkb-scraper:alpha1
+          name: user-associator
+          command: ['/root/bkb-caldav-scraper']
+          args: ['user-associate']
+          env:
+          - name: DISTANCE_MATRIX_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: google-maps-platform
+                key: token
+          volumeMounts:
+            - name: psql-tls-secrets
+              mountPath: "/psql-tls-secrets"
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bkb-scraper
+  namespace: event-aggregator
+spec:
+  schedule: "@daily"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: psql-tls-secrets
+              secret:
+                secretName: psql-client-secret
+                optional: true
+                defaultMode: 0640
+          containers:
+            - image: cr.local.ongy.net/bkb-scraper:alpha1
+              name: user-associator
+              command: ['/root/bkb-caldav-scraper']
+              args: ['bkb-scrape']
+              volumeMounts:
+                - name: psql-tls-secrets
+                  mountPath: "/psql-tls-secrets"
+                  readOnly: true
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: caldav-syncer
+  namespace: event-aggregator
+spec:
+  schedule: "@hourly"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: psql-tls-secrets
+              secret:
+                secretName: psql-client-secret
+                optional: true
+                defaultMode: 0640
+          containers:
+            - image: cr.local.ongy.net/bkb-scraper:alpha1
+              name: user-associator
+              command: ['/root/bkb-caldav-scraper']
+              args: ['caldav']
+              volumeMounts:
+                - name: psql-tls-secrets
+                  mountPath: "/psql-tls-secrets"
+                  readOnly: true
+          restartPolicy: OnFailure
