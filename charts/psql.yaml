@@ -83,6 +83,7 @@ spec:
   isCA: true
   duration: 8760h # 1 years
   commonName: psql.psql
+  dnsNames: ["psql.psql", "psql.psql.svc.cluster.local"]
   secretName: psql-server-secret
   privateKey:
     algorithm: ECDSA
