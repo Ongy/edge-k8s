@@ -112,7 +112,7 @@ spec:
             optional: true
             defaultMode: 0640
       containers:
-        - image: cr.local.ongy.net/bkb-scraper:alpha1
+        - image: cr.local.ongy.net/bkb-scraper:alpha3
           name: user-associator
           command: ['/root/bkb-caldav-scraper']
           args: ['user-associate']
@@ -130,7 +130,7 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: bkb-scraper
+  name: web-scrapers
   namespace: event-aggregator
 spec:
   schedule: "@daily"
@@ -145,10 +145,18 @@ spec:
                 optional: true
                 defaultMode: 0640
           containers:
-            - image: cr.local.ongy.net/bkb-scraper:alpha1
-              name: user-associator
+            - image: cr.local.ongy.net/bkb-scraper:alpha3
+              name: bkb-scrape
               command: ['/root/bkb-caldav-scraper']
               args: ['bkb-scrape']
+              volumeMounts:
+                - name: psql-tls-secrets
+                  mountPath: "/psql-tls-secrets"
+                  readOnly: true
+            - image: cr.local.ongy.net/bkb-scraper:alpha3
+              name: kyuvb-scrape
+              command: ['/root/bkb-caldav-scraper']
+              args: ['kyuvb-scrape']
               volumeMounts:
                 - name: psql-tls-secrets
                   mountPath: "/psql-tls-secrets"
@@ -173,8 +181,8 @@ spec:
                 optional: true
                 defaultMode: 0640
           containers:
-            - image: cr.local.ongy.net/bkb-scraper:alpha1
-              name: user-associator
+            - image: cr.local.ongy.net/bkb-scraper:alpha3
+              name: caldav-sync
               command: ['/root/bkb-caldav-scraper']
               args: ['caldav']
               volumeMounts:
