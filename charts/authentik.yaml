@@ -1,0 +1,253 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: authentik
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis
+  name: redis
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      volumes:
+        - name: redis-data
+          nfs:
+            path: /srv/share/backed/appdata/authentik/redis
+            server: mario.local.ongy.net
+            readOnly: false
+      containers:
+        - image: docker.io/library/redis:7
+          name: redis
+          volumeMounts:
+            - mountPath: "/data"
+              name: redis-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: server
+  name: server
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      volumes:
+      - name: psql-tls-secrets
+        secret:
+          secretName: psql-client-secret
+          optional: true
+          defaultMode: 0640
+      - name: authentik-media
+        nfs:
+          path: /srv/share/backed/appdata/authentik/server/media
+          server: mario.local.ongy.net
+          readOnly: false
+      - name: authentik-templates
+        nfs:
+          path: /srv/share/backed/appdata/authentik/server/templates
+          server: mario.local.ongy.net
+          readOnly: false
+      containers:
+      - image: cr.local.ongy.net/authentik/server
+        name: server
+        args:
+        - server
+        env:
+        - name: AUTHENTIK_POSTGRESQL__HOST
+          value: psql.psql
+        - name: AUTHENTIK_POSTGRESQL__USER
+          value: authentik
+        - name: AUTHENTIK_POSTGRESQL__PASSWORD
+          value: authentik
+        - name: AUTHENTIK_POSTGRESQL__DBSSLMODE
+          value: "verify-ca"
+        - name: AUTHENTIK_POSTGRESQL__SSLROOTCERT
+          value: "/psql-tls-secrets/..data/ca.crt"
+        - name: AUTHENTIK_POSTGRESQL__SSLCERT
+          value: "/psql-tls-secrets/..data/tls.crt"
+        - name: AUTHENTIK_POSTGRESQL__SSLKEY
+          value: "/psql-tls-secrets/..data/tls.key"
+        - name: AUTHENTIK_SECRET_KEY
+          value: authentik
+        - name: AUTHENTIK_REDIS__HOST
+          value: redis.authentik
+        volumeMounts:
+        - name: psql-tls-secrets
+          mountPath: "/psql-tls-secrets"
+          readOnly: true
+        - mountPath: "/media"
+          name: authentik-media
+          readOnly: false
+        - mountPath: "/templates"
+          name: authentik-templates
+          readOnly: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: worker
+  name: worker
+  namespace: authentik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      volumes:
+      - name: psql-tls-secrets
+        secret:
+          secretName: psql-client-secret
+          optional: true
+          defaultMode: 0640
+      - name: authentik-media
+        nfs:
+          path: /srv/share/backed/appdata/authentik/server/media
+          server: mario.local.ongy.net
+          readOnly: false
+      - name: authentik-templates
+        nfs:
+          path: /srv/share/backed/appdata/authentik/server/templates
+          server: mario.local.ongy.net
+          readOnly: false
+      - name: authentik-certs
+        nfs:
+          path: /srv/share/backed/appdata/authentik/worker/certs
+          server: mario.local.ongy.net
+          readOnly: false
+      containers:
+      - image: cr.local.ongy.net/authentik/server
+        name: worker
+        args:
+        - worker
+        env:
+        - name: AUTHENTIK_POSTGRESQL__HOST
+          value: psql.psql
+        - name: AUTHENTIK_POSTGRESQL__USER
+          value: authentik
+        - name: AUTHENTIK_POSTGRESQL__PASSWORD
+          value: authentik
+        - name: AUTHENTIK_POSTGRESQL__DBSSLMODE
+          value: "verify-ca"
+        - name: AUTHENTIK_POSTGRESQL__SSLROOTCERT
+          value: "/psql-tls-secrets/..data/ca.crt"
+        - name: AUTHENTIK_POSTGRESQL__SSLCERT
+          value: "/psql-tls-secrets/..data/tls.crt"
+        - name: AUTHENTIK_POSTGRESQL__SSLKEY
+          value: "/psql-tls-secrets/..data/tls.key"
+        - name: AUTHENTIK_SECRET_KEY
+          value: authentik
+        - name: AUTHENTIK_REDIS__HOST
+          value: redis.authentik
+        volumeMounts:
+        - name: psql-tls-secrets
+          mountPath: "/psql-tls-secrets"
+          readOnly: true
+        - mountPath: "/media"
+          name: authentik-media
+          readOnly: false
+        - mountPath: "/templates"
+          name: authentik-templates
+          readOnly: false
+        - mountPath: "/certs"
+          name: authentik-certs
+          readOnly: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authentik
+  namespace: authentik
+spec:
+  selector:
+    app: server
+  ports:
+    - protocol: TCP
+      port: 9000
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: authentik
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: authentik
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [authentik.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: authentik.authentik.svc.cluster.local
+---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: authentik
+#   namespace: authentik
+# spec:
+#   policyTypes:
+#     - Ingress
+#   ingress:
+#     - from:
+#         - namespaceSelector:
+#             matchLabels:
+#               kubernetes.io/metadata.name: istio-system
+#       ports:
+#         - protocol: TCP
+#           port: 9000
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: psql-client-secret
+  namespace: authentik
+spec:
+  isCA: false
+  duration: 8760h # 1 years
+  commonName: authentik
+  secretName: psql-client-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: psql-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+
