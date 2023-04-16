@@ -190,3 +190,122 @@ spec:
                   mountPath: "/psql-tls-secrets"
                   readOnly: true
           restartPolicy: OnFailure
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: frontend
+  name: frontend
+  namespace: event-aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      volumes:
+        - name: psql-tls-secrets
+          secret:
+            secretName: psql-client-secret
+            optional: true
+            defaultMode: 0640
+        - name: oidc-secrets
+          secret:
+            secretName: authentik-oauth
+            optional: true
+            defaultMode: 0640
+      containers:
+        - image: cr.local.ongy.net/bkb-scraper:dev
+          imagePullPolicy: Always
+          name: prod
+          command: ['/root/bkb-caldav-scraper']
+          args: 
+          - --logtostderr=true
+          - --v=3
+          - 'serve'
+          - --own-url=https://event-aggregator.local.ongy.net
+          - --oauth-url=https://authentik.local.ongy.net/application/o/event-aggregator/
+          - --client-id-path=/oidc-secrets/clientid
+          - --client-secret-path=/oidc-secrets/clientsecret
+          volumeMounts:
+            - name: psql-tls-secrets
+              mountPath: "/psql-tls-secrets"
+              readOnly: true
+            - name: oidc-secrets
+              mountPath: "/oidc-secrets"
+              readOnly: true
+        - image: cr.local.ongy.net/bkb-scraper:dev
+          imagePullPolicy: Always
+          name: dev
+          command: ['/root/bkb-caldav-scraper']
+          args: 
+          - --logtostderr=true
+          - --v=5
+          - 'serve'
+          - --port=8081
+          - --own-url=http://localhost:3000
+          - --oauth-url=https://authentik.local.ongy.net/application/o/event-aggregator/
+          - --client-id-path=/oidc-secrets/clientid
+          - --client-secret-path=/oidc-secrets/clientsecret
+          volumeMounts:
+            - name: psql-tls-secrets
+              mountPath: "/psql-tls-secrets"
+              readOnly: true
+            - name: oidc-secrets
+              mountPath: "/oidc-secrets"
+              readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: event-aggregator
+spec:
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 8080
+      name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-frontend
+  namespace: event-aggregator
+spec:
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 8081
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dev-event-aggregator
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [dev-event-aggregator.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: dev-frontend.event-aggregator.svc.cluster.local
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: event-aggregator
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [event-aggregator.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: frontend.event-aggregator.svc.cluster.local
