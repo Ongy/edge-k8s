@@ -128,6 +128,10 @@ spec:
       nodeSelector:
         graphics: wayland
       volumes:
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory
+            sizeLimit: 500Mi
         - name: user-run
           hostPath:
             path: "/run/user/1000/"
@@ -141,10 +145,7 @@ spec:
             path: "/tmp/.X11-unix/"
             type: Directory
       containers:
-        - image: cr.local.ongy.net/jellyfin-mpv-shim:alpha1
-#        - image: alpine
-#          command: ["sleep"]
-#          args: ["infinity"]
+        - image: cr.local.ongy.net/jellyfin-mpv-shim:alpha2
           env:
           - name: XDG_RUNTIME_DIR
             value: "/run/user/1000/"
@@ -153,6 +154,9 @@ spec:
           - name: DISPLAY
             value: ":0"
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 110
             privileged: true
           name: jellyfin-mpv
           volumeMounts:
@@ -162,3 +166,46 @@ spec:
               name: config-home
             - mountPath: "/tmp/.X11-unix/"
               name: x11-unix
+            - mountPath: "/tmp/"
+              name: tmp-dir
+---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: jellyfin-mpv
+#   namespace: jellyfin
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: jellyfin-mpv
+#   policyTypes:
+#     - Ingress
+#     - Egress
+#   egress:
+#     - to:
+#         - podSelector:
+#             matchLabels:
+#               app: jellyfin
+#       ports:
+#         - protocol: TCP
+#           port: 8096
+#     - to:
+#         - namespaceSelector:
+#             matchLabels:
+#               kubernetes.io/metadata.name: istio-system
+#       ports:
+#         - protocol: TCP
+#           port: 443
+#     - to:
+#         - ipBlock:
+#             cidr: 192.168.128.188/32
+#       ports:
+#         - protocol: TCP
+#           port: 443
+#     - to:
+#         - namespaceSelector:
+#             matchLabels:
+#               kubernetes.io/metadata.name: kube-system
+#       ports:
+#         - protocol: UDP
+#           port: 53
