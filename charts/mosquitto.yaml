@@ -51,20 +51,6 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mosquitto-lb
-  namespace: mosquitto
-spec:
-  type: LoadBalancer
-  selector:
-    app: mosquitto
-  ports:
-    - protocol: TCP
-      port: 1883
-      name: mqtt
----
-apiVersion: v1
-kind: Service
-metadata:
   name: mosquitto
   namespace: mosquitto
 spec:
