@@ -3,6 +3,85 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: paperless
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supervisord-config
+  namespace: paperless
+data:
+  supervisord.conf: |-
+    [supervisord]
+    nodaemon=true                ; start in foreground if true; default false
+    logfile=/dev/stdout          ; main log file; default $CWD/supervisord.log
+    pidfile=/tmp/supervisord.pid ; supervisord pidfile; default supervisord.pid
+    logfile_maxbytes=0           ; max main logfile bytes b4 rotation; default 50MB
+    logfile_backups=0            ; # of main logfile backups; 0 means none, default 10
+    loglevel=info                ; log level; default info; others: debug,warn,trace
+    user=paperless
+
+    [program:gunicorn]
+    command=gunicorn -c /usr/src/paperless/gunicorn.conf.py paperless.asgi:application
+    user=paperless
+    priority = 1
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+
+    [program:consumer]
+    command=python3 manage.py document_consumer
+    user=paperless
+    stopsignal=INT
+    priority = 20
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+
+    [program:celery]
+
+    command = celery --app paperless worker --loglevel INFO
+    user=paperless
+    stopasgroup = true
+    stopwaitsecs = 60
+    priority = 5
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+
+    [program:celery-beat]
+
+    command = celery --app paperless beat --loglevel INFO
+    user=paperless
+    stopasgroup = true
+    priority = 10
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+
+    [program:celery-flower]
+    command = /usr/local/bin/flower-conditional.sh
+    user = paperless
+    startsecs = 0
+    priority = 40
+    stdout_logfile=/dev/stdout
+    stdout_logfile_maxbytes=0
+    stderr_logfile=/dev/stderr
+    stderr_logfile_maxbytes=0
+
+
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -47,6 +126,18 @@ spec:
             readOnly: false
       containers:
         - image: docker.io/library/redis:7
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+              add: ['NET_BIND_SERVICE']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 1000
+            privileged: false
           name: broker
           volumeMounts:
             - mountPath: "/data"
@@ -73,6 +164,17 @@ spec:
         fsGroup: 1000
         fsGroupChangePolicy: "OnRootMismatch"
       volumes:
+        - name: supervisord-config
+          configMap:
+            name: supervisord-config
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory
+            sizeLimit: 500Mi
+        - name: var-log
+          emptyDir:
+            medium: Memory
+            sizeLimit: 500Mi
         - name: paperless-data
           nfs:
             path: /srv/share/backed/appdata/paperless/data
@@ -100,6 +202,22 @@ spec:
             defaultMode: 0640
       containers:
         - image: cr.local.ongy.net/paperless-ngx/paperless-ngx:latest
+          command: ['/usr/local/bin/supervisord']
+          args:
+          - -c
+          - /etc/supervisord.conf
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+              add: ['NET_BIND_SERVICE']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            privileged: false
           readinessProbe:
             httpGet:
               path: /
@@ -132,6 +250,14 @@ spec:
             value: https://paperless.local.ongy.net
           name: core
           volumeMounts:
+            #- mountPath: "/usr/src/paperless/src/supervisord.conf"
+            - mountPath: "/etc/supervisord.conf"
+              name: supervisord-config
+              subPath: supervisord.conf
+            - mountPath: "/tmp/"
+              name: tmp-dir
+            - mountPath: "/var/log/supervisord"
+              name: var-log
             - mountPath: "/usr/src/paperless/data"
               name: paperless-data
             - mountPath: "/usr/src/paperless/media"

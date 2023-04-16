@@ -3,6 +3,51 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: photoprism
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: photoprism-config-pv
+spec:
+  capacity:
+    storage: 100G
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: photoprism-config-pvc
+    namespace: photoprism
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /srv/share/backed/appdata/photoprism
+    server: mario.local.ongy.net
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: photoprism-config-pvc
+  namespace: photoprism
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+  volumeName: photoprism-config-pv
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,12 +68,27 @@ spec:
     spec:
       volumes:
         - name: photoprism-config
-          nfs:
-            path: /srv/share/backed/appdata/photoprism
-            server: mario.local.ongy.net
-            readOnly: false
+          persistentVolumeClaim:
+            claimName: photoprism-config-pvc
+
+          #nfs:
+          #  path: /srv/share/backed/appdata/photoprism
+          #  server: mario.local.ongy.net
+          #  readOnly: false
       containers:
         - image: photoprism/photoprism
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+              add: ['NET_BIND_SERVICE']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            privileged: false
           readinessProbe:
             httpGet:
               path: /
