@@ -2,7 +2,7 @@ FROM alpine
 
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache font-inconsolata font-dejavu font-noto font-noto-cjk font-awesome font-noto-extra font-noto font-noto-thai font-noto-tibetan font-ipa font-sony-misc font-daewoo-misc font-jis-misc
-RUN apk add --update --no-cache python3 mpv yt-dlp mesa-dri-gallium libva-intel-driver && ln -sf python3 /usr/bin/python
+RUN apk add --update --no-cache python3 curl mpv yt-dlp mesa-dri-gallium libva-intel-driver && ln -sf python3 /usr/bin/python
 RUN python3 -m ensurepip && pip3 install --no-cache --upgrade jellyfin-mpv-shim
 
 ARG user=jellyfin

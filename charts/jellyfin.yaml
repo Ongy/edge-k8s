@@ -4,6 +4,40 @@ kind: Namespace
 metadata:
   name: jellyfin
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jellyfin-mpv-log-reader
+  namespace: jellyfin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: jellyfin
+  name: log-reader
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods", "pods/log"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: jellyfin-mpv-log-reader
+  namespace: jellyfin
+subjects:
+# You can specify more than one "subject"
+- kind: ServiceAccount
+  name: jellyfin-mpv-log-reader # "name" is case sensitive
+  namespace: jellyfin
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: log-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -152,6 +186,7 @@ spec:
       labels:
         app: jellyfin-mpv
     spec:
+      serviceAccountName: jellyfin-mpv-log-reader
       nodeSelector:
         graphics: wayland
       volumes:
@@ -172,7 +207,7 @@ spec:
             path: "/tmp/.X11-unix/"
             type: Directory
       containers:
-        - image: cr.local.ongy.net/jellyfin-mpv-shim:alpha2
+        - image: cr.local.ongy.net/jellyfin-mpv-shim:latest
           env:
           - name: XDG_RUNTIME_DIR
             value: "/run/user/1000/"
@@ -195,6 +230,18 @@ spec:
               name: x11-unix
             - mountPath: "/tmp/"
               name: tmp-dir
+          livenessProbe:
+            exec:
+              command:
+              - sh
+              - -e
+              - -o
+              - pipefail
+              - -c
+              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/jellyfin/pods/${HOSTNAME}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep KeepAlive -q"
+            initialDelaySeconds: 15
+            failureThreshold: 1
+            periodSeconds: 30
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -223,3 +270,35 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+    # Allow to contact the API-server for the liveness probe
+    # There seems to be some bug in cilium that prevents these
+#    - to:
+#        - ipBlock:
+#            cidr: 10.96.0.1/32
+#      ports:
+#        - protocol: TCP
+#          port: 443
+#        - protocol: TCP
+#          port: 6443
+#    - to:
+#        - ipBlock:
+#            cidr: 192.168.128.188/32
+#      ports:
+#        - protocol: TCP
+#          port: 443
+#        - protocol: TCP
+#          port: 6443
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "jellyfin-mpv-to-apiserver"
+  namespace: jellyfin
+spec:
+  endpointSelector:
+    matchLabels:
+      app: jellyfin-mpv
+  egress:
+  - toEntities:
+    - kube-apiserver
+
