@@ -217,6 +217,9 @@ spec:
           hostPath:
             path: "/tmp/.X11-unix/"
             type: Directory
+        - name: kube-root-ca
+          configMap:
+            name: kube-root-ca.crt
       containers:
         - image: cr.local.ongy.net/jellyfin-mpv-shim:latest
           env:
@@ -253,13 +256,16 @@ spec:
               name: x11-unix
             - mountPath: "/tmp/"
               name: tmp-dir
+            - mountPath: "/etc/kube-ca.crt"
+              name: kube-root-ca
+              subPath: ca.crt
           livenessProbe:
             exec:
               command:
               - sh
               - -e
               - -c
-              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/${KUBERNETES_NAMESPACE}/pods/${KUBERNETES_POD}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep -q -e KeepAlive -e /Sessions/Playing/Progress"
+              - "curl --ca-cert /etc/kube-ca.crt -s https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/${KUBERNETES_NAMESPACE}/pods/${KUBERNETES_POD}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep -q -e KeepAlive -e /Sessions/Playing/Progress"
             timeoutSeconds: 5
             initialDelaySeconds: 15
             failureThreshold: 2
