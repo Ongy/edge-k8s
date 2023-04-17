@@ -3,6 +3,17 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: jellyfin
+  
+  labels:
+    # Need some more time debugging the client to disable privileged!
+    #pod-security.kubernetes.io/enforce: baseline
+    #pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -80,7 +91,6 @@ spec:
               type: RuntimeDefault
             capabilities:
               drop: ['ALL']
-              add: ['NET_BIND_SERVICE']
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             privileged: false
@@ -215,7 +225,19 @@ spec:
             value: "invalid"
           - name: DISPLAY
             value: ":0"
+          - name: KUBERNETES_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: KUBERNETES_POD
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 110
@@ -238,7 +260,7 @@ spec:
               - -o
               - pipefail
               - -c
-              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/jellyfin/pods/${HOSTNAME}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep KeepAlive -q"
+              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/${KUBERNETES_NAMESPACE}/pods/${KUBERNETES_POD}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep KeepAlive -q"
             initialDelaySeconds: 15
             failureThreshold: 1
             periodSeconds: 30
