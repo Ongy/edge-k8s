@@ -33,16 +33,20 @@ spec:
             path: "/srv/share/media/"
             type: Directory
       containers:
-        - image: cr.hotio.dev/hotio/jellyfin:latest
+        - image: jellyfin/jellyfin:latest
           env:
-          - name: PUID
-            value: "1000"
-          - name: GUID
-            value: "1004"
-          - name: UMASK
-            value: "002"
+          - name: JELLYFIN_DATA_DIR
+            value: /config/data
+          - name: JELLYFIN_CONFIG_DIR
+            value: /config
+          - name: JELLYFIN_CACHE_DIR
+            value: /config/cache
           securityContext:
-            privileged: true
+            readOnlyRootFilesystem: false
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1004
           readinessProbe:
             httpGet:
               path: /health
