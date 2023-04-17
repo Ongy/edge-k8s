@@ -196,6 +196,7 @@ spec:
       labels:
         app: jellyfin-mpv
     spec:
+      terminationGracePeriodSeconds: 5
       serviceAccountName: jellyfin-mpv-log-reader
       nodeSelector:
         graphics: wayland
@@ -257,13 +258,12 @@ spec:
               command:
               - sh
               - -e
-              - -o
-              - pipefail
               - -c
-              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/${KUBERNETES_NAMESPACE}/pods/${KUBERNETES_POD}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep KeepAlive -q"
+              - "curl -sk https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}/api/v1/namespaces/${KUBERNETES_NAMESPACE}/pods/${KUBERNETES_POD}/log?sinceSeconds=60 -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" | grep -q -e KeepAlive -e /Sessions/Playing/Progress"
+            timeoutSeconds: 5
             initialDelaySeconds: 15
-            failureThreshold: 1
-            periodSeconds: 30
+            failureThreshold: 2
+            periodSeconds: 15
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
