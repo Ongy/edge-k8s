@@ -3,6 +3,52 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: authentik
+
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: authentik-redis-pv
+spec:
+  capacity:
+    storage: 1G
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: authentik-redis-pvc
+    namespace: authentik
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /srv/share/backed/appdata/authentik/redis
+    server: mario.local.ongy.net
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: authentik-redis-pvc
+  namespace: authentik
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+  volumeName: authentik-redis-pv
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,12 +69,21 @@ spec:
     spec:
       volumes:
         - name: redis-data
-          nfs:
-            path: /srv/share/backed/appdata/authentik/redis
-            server: mario.local.ongy.net
-            readOnly: false
+          persistentVolumeClaim:
+            claimName: authentik-redis-pvc
       containers:
         - image: docker.io/library/redis:7
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 996
+            runAsGroup: 996
+            privileged: false
           name: redis
           volumeMounts:
             - mountPath: "/data"
@@ -69,6 +124,17 @@ spec:
           readOnly: false
       containers:
       - image: cr.local.ongy.net/authentik/server
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ['ALL']
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 996
+          runAsGroup: 996
+          privileged: false
         name: server
         args:
         - server
@@ -142,6 +208,17 @@ spec:
           readOnly: false
       containers:
       - image: cr.local.ongy.net/authentik/server
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ['ALL']
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 996
+          runAsGroup: 996
+          privileged: false
         name: worker
         args:
         - worker
