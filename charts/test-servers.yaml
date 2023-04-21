@@ -1,0 +1,203 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-env
+
+  labels:
+    # Baseline, because I don't want to bother with the volume claims
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: radicale-data-pv
+spec:
+  capacity:
+    storage: 1G
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: radicale-data-pvc
+    namespace: test-env
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /srv/share/backed/appdata/radicale/data
+    server: mario.local.ongy.net
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radicale-data-pvc
+  namespace: test-env
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+  volumeName: radicale-data-pv
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: radicale-config-v2
+  namespace: test-env
+data:
+  users: |
+    testuser:testpassword2
+  config: |-
+    [auth]
+    type = htpasswd
+    htpasswd_filename = /etc/radicale/users
+    # encryption method used in the htpasswd file
+    htpasswd_encryption = plain
+
+    [server]
+    hosts = 0.0.0.0:5232, [::]:5232
+    # /var/lib/radicale/collections
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: radicale
+  name: radicale
+  namespace: test-env
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: radicale
+  template:
+    metadata:
+      labels:
+        app: radicale
+    spec:
+      volumes:
+        - name: radicale-config
+          configMap:
+            name: radicale-config-v1
+        - name: radicale-data
+          persistentVolumeClaim:
+            claimName: radicale-data-pvc
+      containers:
+        - image: cr.local.ongy.net/radicale:latest
+          name: radicale
+          volumeMounts:
+            - mountPath: "/etc/radicale/"
+              name: radicale-config
+            - mountPath: "/var/lib/radicale/collections"
+              name: radicale-data
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 995
+            runAsGroup: 995
+            privileged: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radicale
+  namespace: test-env
+spec:
+  selector:
+    app: radicale
+  ports:
+    - protocol: TCP
+      port: 5232
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: agendav
+  name: agendav
+  namespace: test-env
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agendav
+  template:
+    metadata:
+      labels:
+        app: agendav
+    spec:
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory
+            sizeLimit: 500Mi
+      containers:
+        - image: ghcr.io/nagimov/agendav-docker:latest
+          name: agendav
+          volumeMounts:
+          - mountPath: "/tmp/"
+            name: tmp-dir
+          env:
+          - name: AGENDAV_SERVER_NAME
+            value: 0.0.0.0:8080
+          - name: AGENDAV_CALDAV_SERVER
+            value: http://radicale.test-env.svc.cluster.local:5232/%u
+          - name: AGENDAV_CALDAV_PUBLIC_URL
+            value: https://agendav.local.ongy.net
+          - name: AGENDAV_TIMEZONE
+            value: Europe/Berlin
+          - name: AGENDAV_LOG_DIR
+            value: /tmp/
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+#            runAsNonRoot: true
+#            runAsUser: 995
+#            runAsGroup: 995
+            privileged: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agendav
+  namespace: test-env
+spec:
+  selector:
+    app: agendav
+  ports:
+    - protocol: TCP
+      port: 8080
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: agendav
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [agendav.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: agendav.test-env.svc.cluster.local
