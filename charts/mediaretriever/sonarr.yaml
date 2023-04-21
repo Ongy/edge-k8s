@@ -97,7 +97,10 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: qbittorrent
+              kubernetes.io/metadata.name: mediaretriever
+        - podSelector:
+            matchLabels:
+              app: qbittorrent
       ports:
         - protocol: TCP
           port: 8080

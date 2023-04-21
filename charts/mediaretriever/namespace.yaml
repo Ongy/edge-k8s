@@ -14,6 +14,9 @@ metadata:
   name: default
   namespace: mediaretriever
 spec:
+  podSelector:
+    matchExpressions:
+    - { key: app, operator: NotIn, values: [qbittorrent] }
   policyTypes:
     - Ingress
     - Egress
