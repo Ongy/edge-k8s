@@ -3,6 +3,53 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: zigbee2mqtt
+
+  labels:
+    # Baseline, because I don't want to bother with the volume claims
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: zigbee-pv
+spec:
+  capacity:
+    storage: 1G
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: zigbee-pvc
+    namespace: zigbee2mqtt
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /srv/share/backed/appdata/zigbee2mqtt
+    server: mario.local.ongy.net
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zigbee-pvc
+  namespace: zigbee2mqtt
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: "" # Empty string must be explicitly set otherwise default StorageClass will be set
+  volumeName: zigbee-pv
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,10 +70,8 @@ spec:
     spec:
       volumes:
         - name: zigbee2mqtt-data
-          nfs:
-            path: /srv/share/backed/appdata/zigbee2mqtt
-            server: mario.local.ongy.net
-            readOnly: false
+          persistentVolumeClaim:
+            claimName: zigbee-pvc
       containers:
         - image: koenkk/zigbee2mqtt
           imagePullPolicy: Always
@@ -35,11 +80,11 @@ spec:
               type: RuntimeDefault
             capabilities:
               drop: ['ALL']
-              add: ['MKNOD']
+            allowPrivilegeEscalation: false
             runAsNonRoot: true
             runAsUser: 998
             runAsGroup: 20
-            privileged: true
+            privileged: false
           env:
           - name: TZ
             value: Europe/Amsterdam

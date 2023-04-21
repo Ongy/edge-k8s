@@ -3,6 +3,17 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: mosquitto
+
+  labels:
+    # Baseline, because I don't want to bother with the volume claims
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+
+    # We are setting these to our _desired_ `enforce` level.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -23,29 +34,24 @@ spec:
     spec:
       volumes:
         - name: mosquitto-config
-          nfs:
-            path: /srv/share/backed/appdata/mosquitto/config
-            server: mario.local.ongy.net
-            readOnly: true
-        - name: mosquitto-data
-          nfs:
-            path: /srv/share/backed/appdata/mosquitto/data
-            server: mario.local.ongy.net
-            readOnly: false
-        - name: mosquitto-log
-          nfs:
-            path: /srv/share/backed/appdata/mosquitto/log
-            server: mario.local.ongy.net
-            readOnly: false
+          configMap:
+            name: mosquitto-config-v2
       containers:
         - image: eclipse-mosquitto:latest
+          securityContext:
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1883
+            runAsGroup: 1883
+            privileged: false
           name: mosquitto
           volumeMounts:
-            - mountPath: "/mosquitto/data"
-              name: mosquitto-data
-            - mountPath: "/mosquitto/logs"
-              name: mosquitto-log
-            - mountPath: "/mosquitto/config/mosquitto.conf"
+            - mountPath: "/mosquitto/config"
               name: mosquitto-config
 ---
 apiVersion: v1
@@ -82,6 +88,17 @@ spec:
       hostNetwork: true
       containers:
         - image: alpine/socat
+          securityContext:
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10100
+            runAsGroup: 10100
+            privileged: false
           name: http-proxy
           args:
           - TCP6-LISTEN:1883,reuseaddr,fork
