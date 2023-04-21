@@ -2,23 +2,26 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: ytdl-sub
+  namespace: mediaretriever
 spec:
-  schedule: "5 * * * *"
+  schedule: "*/5 * * * *"
   jobTemplate:
     spec:
       template:
         spec:
           volumes:
-            - name: ytdl-config
-              nfs:
-                path: /srv/share/backed/appdata/yt-dlp
-                server: mario.local.ongy.net
-                readOnly: false
-            - name: media-data
-              nfs:
-                path: /srv/share/media/youtube
-                server: mario.local.ongy.net
-                readOnly: false
+          - name: tmp-dir
+            emptyDir:
+              medium: Memory
+              sizeLimit: 500Mi
+          - name: ytdl-config
+            configMap:
+              name: ytdl-config-v1
+          - name: media-data
+            nfs:
+              path: /srv/share/media/youtube
+              server: mario.local.ongy.net
+              readOnly: false
           containers:
           - name: ytdl
             env:
@@ -31,16 +34,24 @@ spec:
             - name: TZ
               value: "Europe/Berlin"
             securityContext:
-              privileged: true
+              privileged: false
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
             image: ghcr.io/jmbannon/ytdl-sub:latest
             imagePullPolicy: Always
             command:
             - ytdl-sub
             - sub
-            workingDir: "/config"
+            - --config
+            - /config/config.yaml
+            - --subscription-paths
+            - /config/subscriptions.yaml
+            workingDir: "/tmp"
             volumeMounts:
-              - mountPath: "/config"
-                name: ytdl-config
-              - mountPath: "/tv_shows"
-                name: media-data
+            - mountPath: "/config"
+              name: ytdl-config
+            - mountPath: "/tv_shows"
+              name: media-data
+            - mountPath: "/tmp/"
+              name: tmp-dir
           restartPolicy: OnFailure
