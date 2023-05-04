@@ -34,6 +34,38 @@ spec:
             value: "/var/lib/grafana/grafana.ini"
           - name: GF_SERVER_ROOT_URL
             value: "https://grafana.local.ongy.net"
+
+          - name: GF_AUTH_GENERIC_OAUTH_ENABLED
+            value: "true"
+          - name: GF_AUTH_GENERIC_OAUTH_NAME
+            value: "authentik"
+          - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: authentik-oauth
+                key: clientid
+          - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: authentik-oauth
+                key: clientsecret
+          - name: GF_AUTH_GENERIC_OAUTH_SCOPES
+            value: "openid profile email"
+          - name: GF_AUTH_GENERIC_OAUTH_AUTH_URL
+            value: "https://authentik.local.ongy.net/application/o/authorize/"
+          - name: GF_AUTH_GENERIC_OAUTH_TOKEN_URL
+            value: "https://authentik.local.ongy.net/application/o/token/"
+          - name: GF_AUTH_GENERIC_OAUTH_API_URL
+            value: "https://authentik.local.ongy.net/application/o/userinfo/"
+          - name: GF_AUTH_SIGNOUT_REDIRECT_URL
+            value: "https://authentik.local.ongy.net/application/o/grafana/end-session/"
+          - name: GF_AUTH_OAUTH_AUTO_LOGIN
+            value: "true"
+          - name: GF_SERVER_ROOT_URL
+            value: "https://grafana.local.ongy.net"
+          - name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH
+            value: "contains(groups[*], 'Grafana Admins') && 'Admin' || contains(groups[*], 'Grafana Editors') && 'Editor' || 'Viewer'"
+
           readinessProbe:
             httpGet:
               path: /healthz
