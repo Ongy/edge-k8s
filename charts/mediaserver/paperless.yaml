@@ -371,4 +371,22 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: mediaserver-authorization
+  namespace: istio-system
+spec:
+  action: CUSTOM
+  provider:
+    # The provider name must match the extension provider defined in the mesh config.
+    # You can also replace this with sample-ext-authz-http to test the other external authorizer definition.
+    name: authentik-ext-authz-http
+  rules:
+  # The rules specify when to trigger the external authorizer.
+  - to:
+    - operation:
+        hosts:
+        - "paperless.local.ongy.net"
 
