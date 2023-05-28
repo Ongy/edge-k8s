@@ -54,3 +54,9 @@ spec:
           args:
           - TCP6-LISTEN:443,reuseaddr,fork
           - TCP:istio-ingressgateway:443
+        - image: alpine/socat
+          name: quic-proxy
+          args:
+          - UDP6-LISTEN:443,reuseaddr,fork
+          - UDP:istio-ingressgateway:443
+
