@@ -33,7 +33,7 @@ spec:
             path: "/srv/share/backed/appdata/influxdb/influxdb2-conf/"
             type: Directory
       containers:
-        - image: influxdb:2.0
+        - image: influxdb:2.7
           readinessProbe:
             httpGet:
               path: /health
