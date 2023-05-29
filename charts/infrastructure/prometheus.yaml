@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus
+  namespace: infrastructure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      volumes:
+        - name: prometheus-config
+          nfs:
+            path: /srv/share/backed/appdata/prometheus/config/
+            server: mario.local.ongy.net
+            readOnly: true
+        - name: slash-prometheus
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
+      securityContext:
+        fsGroupChangePolicy: "OnRootMismatch"
+      containers:
+        - image: prom/prometheus:latest
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ['ALL']
+            allowPrivilegeEscalation: false
+            privileged: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            runAsUser: 65530
+            runAsGroup: 65530
+          name: prometheus
+          volumeMounts:
+            - mountPath: "/etc/prometheus"
+              name: prometheus-config
+            - mountPath: "/prometheus"
+              name: slash-prometheus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: infrastructure
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      name: http
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: prometheus
+spec:
+  gateways: [istio-system/gateway]
+  hosts: [prometheus.local.ongy.net]
+  http:
+  - route:
+    - destination:
+        host: prometheus.infrastructure.svc.cluster.local
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: grafana
+#   namespace: grafana
+# spec:
+#   policyTypes:
+#     - Ingress
+# #    - Egress
+#   ingress:
+#     - from:
+#         - namespaceSelector:
+#             matchLabels:
+#               kubernetes.io/metadata.name: istio-system
+#       ports:
+#         - protocol: TCP
+#           port: 3000
+#  egress:
+#    - to:
+#      - namespaceSelector:
+#          matchLabels:
+#            kubernetes.io/metadata.name: influxdb
+#      ports:
+#        - protocol: TCP
+#          port: 8086
