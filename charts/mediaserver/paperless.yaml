@@ -175,7 +175,6 @@ spec:
               type: RuntimeDefault
             capabilities:
               drop: ['ALL']
-              add: ['NET_BIND_SERVICE']
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
@@ -248,7 +247,8 @@ spec:
             optional: false
             defaultMode: 0640
       containers:
-        - image: alpine
+        - image: alpine:edge
+          imagePullPolicy: Always
           name: consume-loop
           command: [sh]
           args:
@@ -292,7 +292,7 @@ spec:
               readOnly: true
             - mountPath: "/data"
               name: paperless-data
-        - image: cr.local.ongy.net/paperless-ngx/paperless-ngx:latest
+        - image: ghcr.io/paperless-ngx/paperless-ngx:1.16.0
           command: ['/usr/local/bin/supervisord']
           args:
           - -c
@@ -302,7 +302,6 @@ spec:
               type: RuntimeDefault
             capabilities:
               drop: ['ALL']
-              add: ['NET_BIND_SERVICE']
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
@@ -476,21 +475,21 @@ spec:
         - protocol: TCP
           port: 6379
 ---
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
-metadata:
-  name: mediaserver-authorization
-  namespace: istio-system
-spec:
-  action: CUSTOM
-  provider:
-    # The provider name must match the extension provider defined in the mesh config.
-    # You can also replace this with sample-ext-authz-http to test the other external authorizer definition.
-    name: authentik-ext-authz-http
-  rules:
-  # The rules specify when to trigger the external authorizer.
-  - to:
-    - operation:
-        hosts:
-        - "paperless.local.ongy.net"
-
+#apiVersion: security.istio.io/v1beta1
+#kind: AuthorizationPolicy
+#metadata:
+#  name: mediaserver-authorization
+#  namespace: istio-system
+#spec:
+#  action: CUSTOM
+#  provider:
+#    # The provider name must match the extension provider defined in the mesh config.
+#    # You can also replace this with sample-ext-authz-http to test the other external authorizer definition.
+#    name: authentik-ext-authz-http
+#  rules:
+#  # The rules specify when to trigger the external authorizer.
+#  - to:
+#    - operation:
+#        hosts:
+#        - "paperless.local.ongy.net"
+#
