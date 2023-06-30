@@ -68,14 +68,13 @@ spec:
       name: mqtt
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   labels:
     app: moquitto-proxy
   name: moquitto-proxy
   namespace: mosquitto
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: mosquitto-proxy
