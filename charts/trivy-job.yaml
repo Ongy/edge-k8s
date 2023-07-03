@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vuln-scanning
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trivy-scan-NAME-DATE
+  namespace: vuln-scanning
+spec:
+  template:
+    spec:
+      volumes:
+        - name: output-data
+          nfs:
+            path: /srv/share/backed/appdata/vuln-scans
+            server: mario.local.ongy.net
+            readOnly: false
+      containers:
+        - image: aquasec/trivy
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "1"
+            limits:
+              memory: "512Mi"
+          name: scanner
+          args:
+          - image
+          - SCAN-TARGET
+          - --scanners
+          - vuln
+          - -f
+          - json
+          - -o
+          - /output/NAME-DATE
+          volumeMounts:
+            - mountPath: "/output"
+              name: output-data
+      restartPolicy: OnFailure
