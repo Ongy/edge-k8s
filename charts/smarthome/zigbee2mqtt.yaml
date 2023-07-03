@@ -94,8 +94,12 @@ spec:
               name: zigbee2mqtt-data
           resources:
             requests:
+              memory: 128Mi
+              cpu: "500m"
               ongy.net/zigbee: 1
             limits:
+              memory: 256Mi
+              cpu: "500m"
               ongy.net/zigbee: 1
 ---
 apiVersion: v1

@@ -47,6 +47,13 @@ spec:
               name: sonarr-config
             - mountPath: "/data"
               name: media-data
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: "100m"
+            limits:
+              memory: 512Mi
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service

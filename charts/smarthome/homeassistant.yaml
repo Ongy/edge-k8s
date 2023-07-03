@@ -34,7 +34,7 @@ spec:
             optional: true
             defaultMode: 0640
       containers:
-        - image: homeassistant/home-assistant:2023.5
+        - image: homeassistant/home-assistant:2023.6
           name: home-assistant
           volumeMounts:
             - mountPath: "/config"
@@ -46,6 +46,11 @@ spec:
             httpGet:
               path: /manifest.json
               port: 8123
+          resources:
+            requests:
+              memory: "512Mi"
+            limits:
+              memory: "1Gi"
 ---
 apiVersion: v1
 kind: Service
