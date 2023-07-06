@@ -34,7 +34,7 @@ spec:
             optional: true
             defaultMode: 0640
       containers:
-        - image: homeassistant/home-assistant:2023.6
+        - image: homeassistant/home-assistant:2023.7
           name: home-assistant
           volumeMounts:
             - mountPath: "/config"
