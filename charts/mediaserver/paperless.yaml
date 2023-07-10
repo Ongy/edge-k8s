@@ -478,7 +478,7 @@ spec:
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: mediaserver-authorization
+  name: paperless
   namespace: istio-system
 spec:
   action: CUSTOM
