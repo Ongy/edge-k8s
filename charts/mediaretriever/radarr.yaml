@@ -111,3 +111,21 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+    name: radarr
+    namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway
+  action: CUSTOM
+  provider:
+    name: "authentik-proxy"
+  rules:
+    - to:
+      - operation:
+          hosts:
+            - "radarr.local.ongy.net"

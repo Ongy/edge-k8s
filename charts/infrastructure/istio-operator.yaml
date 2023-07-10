@@ -38,3 +38,20 @@ spec:
       # on the gateway
       env:
         PILOT_ENABLE_QUIC_LISTENERS: true
+    mesh: |-
+      extensionProviders:
+      - name: "authentik-proxy"
+        envoyExtAuthzHttp:
+          service: "authentik.authentik"
+          port: "9000"
+          pathPrefix: "/outpost.goauthentik.io/auth/envoy"
+          headersToDownstreamOnAllow:
+              - cookie
+          headersToUpstreamOnAllow:
+              - set-cookie
+              - x-authentik-*
+          includeRequestHeadersInCheck:
+              - cookie
+
+
+

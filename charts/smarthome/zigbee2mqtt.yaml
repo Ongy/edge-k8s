@@ -159,3 +159,21 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: z2m
+  namespace: istio-system
+spec:
+  action: CUSTOM
+  provider:
+    # The provider name must match the extension provider defined in the mesh config.
+    # You can also replace this with sample-ext-authz-http to test the other external authorizer definition.
+    name: authentik-proxy
+  rules:
+  # The rules specify when to trigger the external authorizer.
+  - to:
+    - operation:
+        hosts:
+        - "zigbee2mqtt.local.ongy.net"
