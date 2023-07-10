@@ -124,7 +124,7 @@ spec:
           server: mario.local.ongy.net
           readOnly: false
       containers:
-      - image: cr.local.ongy.net/authentik/server
+      - image: ghcr.io/goauthentik/server:2023.6.0
         securityContext:
           seccompProfile:
             type: RuntimeDefault
@@ -140,6 +140,8 @@ spec:
         args:
         - server
         env:
+        - name: AUTHENTIK_ERROR_REPORTING__ENABLED
+          value: "true"
         - name: AUTHENTIK_POSTGRESQL__HOST
           value: psql.psql
         - name: AUTHENTIK_POSTGRESQL__USER
@@ -208,7 +210,7 @@ spec:
           server: mario.local.ongy.net
           readOnly: false
       containers:
-      - image: cr.local.ongy.net/authentik/server
+      - image: ghcr.io/goauthentik/server:2023.6.0
         securityContext:
           seccompProfile:
             type: RuntimeDefault
@@ -224,6 +226,8 @@ spec:
         args:
         - worker
         env:
+        - name: AUTHENTIK_ERROR_REPORTING__ENABLED
+          value: "true"
         - name: AUTHENTIK_POSTGRESQL__HOST
           value: psql.psql
         - name: AUTHENTIK_POSTGRESQL__USER
