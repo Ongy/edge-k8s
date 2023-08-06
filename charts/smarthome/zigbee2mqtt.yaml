@@ -85,6 +85,10 @@ spec:
             runAsUser: 998
             runAsGroup: 20
             privileged: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
           env:
           - name: TZ
             value: Europe/Amsterdam
@@ -94,7 +98,7 @@ spec:
               name: zigbee2mqtt-data
           resources:
             requests:
-              memory: 128Mi
+              memory: 256Mi
               cpu: "500m"
               ongy.net/zigbee: 1
             limits:
