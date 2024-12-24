@@ -6,7 +6,7 @@ metadata:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: trivy-scan-NAME-DATE
+  name: trivy-scan-influx-NAME-DATE
   namespace: vuln-scanning
 spec:
   template:
@@ -18,24 +18,19 @@ spec:
             server: mario.local.ongy.net
             readOnly: false
       containers:
-        - image: aquasec/trivy
+        - image: cr.local.ongy.net/ongy/vuln-checker:latest
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "1"
+              memory: "512Mi"
+              cpu: "2"
             limits:
               memory: "512Mi"
-              cpu: "4"
+              cpu: "2"
           name: scanner
+          command:
+          - /vuln-checker
           args:
-          - image
           - SCAN-TARGET
-          - --scanners
-          - vuln
-          - -f
-          - json
-          - -o
-          - /output/NAME-DATE
           volumeMounts:
             - mountPath: "/output"
               name: output-data
